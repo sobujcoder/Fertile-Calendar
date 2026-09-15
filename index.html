@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fertile Calendar — Full Mode (BN/EN Professional)</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{ --ovulation:#ff6f61; --fertile:#76c7c0; --normal:#f1f1f1; --today:#2b7cff; }
+    body{
+      font-family:"Roboto","Noto Sans Bengali", sans-serif;
+      background:url('https://images.unsplash.com/photo-1521791055366-0d553872125f?auto=format&fit=crop&w=1600&q=80') no-repeat center center fixed;
+      background-size:cover; min-height:100vh; padding:24px;
+    }
+    .overlay{ background:rgba(255,255,255,0.92); border-radius:18px; max-width:980px; margin:auto; padding:28px; box-shadow:0 16px 40px rgba(0,0,0,.15); }
+    h1{ font-size:clamp(22px,2.6vw,30px); text-align:center; margin-bottom:6px; }
+    .subtitle{ text-align:center; color:#5b6b7a; margin-bottom:18px; }
+    .legend .badge{ font-weight:500; }
+    .month-title{ font-weight:700; font-size:18px; text-align:center; margin:22px 0 10px; }
+    .calendar{ display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+    .weekday{ text-align:center; font-weight:600; color:#5b6b7a; }
+    .cell{ position:relative; aspect-ratio:1/1; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:500; background:var(--normal); transition:transform .15s, box-shadow .15s; }
+    .cell.empty{ background:transparent; box-shadow:none; }
+    .cell:hover{ transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,0,0,.15); }
+    .cell.fertile{ background:var(--fertile); color:#fff; }
+    .cell.ovulation{ background:var(--ovulation); color:#fff; font-weight:700; }
+    .cell.today{ outline:3px solid var(--today); outline-offset:2px; }
+    .small{ font-size:12px; }
+    .controls .form-label{ font-weight:600; }
+    .disclaimer{ font-size:13px; color:#5b6b7a; }
+    .print-share{ position:sticky; bottom:0; margin-top:16px; }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="d-flex justify-content-end mb-2 gap-2">
+      <select id="langSwitcher" class="form-select form-select-sm" style="width:auto;">
+        <option value="bn" selected>বাংলা</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <h1 id="title">ফার্টাইল ক্যালেন্ডার — ফুল মোড</h1>
+    <p class="subtitle" id="subtitle">শেষ মাসিকের দিন ও সাইকেল দৈর্ঘ্য দিলে সম্ভাব্য ফার্টাইল উইন্ডো ও ওভুলেশন ডে দেখাবে।</p>
+
+    <form id="calendarForm" class="row g-3 controls" novalidate>
+      <div class="col-12 col-md-6">
+        <label for="periodStart" class="form-label" id="labelStart">শেষ মাসিকের প্রথম দিন</label>
+        <input type="date" class="form-control" id="periodStart" required />
+        <div class="invalid-feedback" id="invalidStart">তারিখ দিন।</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <label for="cycleLength" class="form-label" id="labelCycle">সাইকেল (দিন)</label>
+        <input type="number" class="form-control" id="cycleLength" min="20" max="40" value="28" required />
+        <div class="form-text" id="cycleHelp">২০–৪০</div>
+        <div class="invalid-feedback" id="invalidCycle">২০ থেকে ৪০ দিনের মধ্যে দিন।</div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <label for="monthsToShow" class="form-label mb-0" id="labelMonths">কত মাস দেখাবো</label>
+          <span class="small text-muted" id="monthsHint">বর্তমানসহ</span>
+        </div>
+        <select id="monthsToShow" class="form-select">
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="6">6</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-6">
+        <label for="lutealLength" class="form-label" id="labelLuteal">লুটিয়াল ফেজ (দিন)</label>
+        <input type="number" class="form-control" id="lutealLength" min="10" max="17" value="14" />
+        <div class="form-text" id="lutealHelp">সাধারণত ১৪ দিন ধরা হয়। প্রয়োজনে বদলান।</div>
+      </div>
+      <div class="col-12 col-md-6 d-flex gap-2 align-items-end">
+        <button type="submit" class="btn btn-primary flex-fill" id="btnShow">ক্যালেন্ডার দেখুন</button>
+        <button id="resetBtn" type="button" class="btn btn-outline-secondary">রিসেট</button>
+      </div>
+    </form>
+
+    <div class="mt-3 legend d-flex flex-wrap align-items-center gap-2">
+      <span class="badge text-bg-secondary" id="legendNormal">সাধারণ</span>
+      <span class="badge" style="background:#76c7c0" id="legendFertile">ফার্টাইল</span>
+      <span class="badge" style="background:#ff6f61" id="legendOvulation">ওভুলেশন</span>
+      <span class="badge text-bg-info" id="legendToday">আজ</span>
+    </div>
+
+    <div id="calendarGrid" class="month-wrap"></div>
+
+    <div class="mt-3 d-flex gap-2 print-share">
+      <button id="printBtn" class="btn btn-outline-dark" type="button">🖨 <span id="btnPrintTxt">প্রিন্ট/পিডিএফ</span></button>
+      <button id="shareBtn" class="btn btn-outline-primary" type="button">🔗 <span id="btnShareTxt">শেয়ার</span></button>
+    </div>
+
+    <hr class="my-4" />
+    <p class="disclaimer" id="disclaimer">নোট: এটি শিক্ষামূলক টুল—চিকিৎসা পরামর্শ নয়। সাইকেল অনিয়মিত হলে বা গর্ভধারণ/পরিবার পরিকল্পনা সম্পর্কিত সিদ্ধান্তের আগে স্বাস্থ্য বিশেষজ্ঞের পরামর্শ নিন।</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ==== i18n texts ====
+    const T = {
+      bn:{ title:"ফার্টাইল ক্যালেন্ডার — ফুল মোড", subtitle:"শেষ মাসিকের দিন ও সাইকেল দৈর্ঘ্য দিলে সম্ভাব্য ফার্টাইল উইন্ডো ও ওভুলেশন ডে দেখাবে।", start:"শেষ মাসিকের প্রথম দিন", cycle:"সাইকেল (দিন)", months:"কত মাস দেখাবো", monthsHint:"বর্তমানসহ", luteal:"লুটিয়াল ফেজ (দিন)", lutealHelp:"সাধারণত ১৪ দিন ধরা হয়। প্রয়োজনে বদলান।", show:"ক্যালেন্ডার দেখুন", normal:"সাধারণ", fertile:"ফার্টাইল", ovulation:"ওভুলেশন", today:"আজ", print:"প্রিন্ট/পিডিএফ", share:"শেয়ার", disclaimer:"নোট: এটি শিক্ষামূলক টুল—চিকিৎসা পরামর্শ নয়। সাইকেল অনিয়মিত হলে বা গর্ভধারণ/পরিবার পরিকল্পনা সম্পর্কিত সিদ্ধান্তের আগে স্বাস্থ্য বিশেষজ্ঞের পরামর্শ নিন।", invalidStart:"তারিখ দিন।", invalidCycle:"২০ থেকে ৪০ দিনের মধ্যে দিন।", weekdays:["রবি","সোম","মঙ্গল","বুধ","বৃহঃ","শুক্র","শনি"], locale:"bn-BD" },
+      en:{ title:"Fertile Calendar — Full Mode", subtitle:"Enter last period date & cycle length to see fertile window & ovulation day.", start:"First day of last period", cycle:"Cycle (days)", months:"Months to show", monthsHint:"including current", luteal:"Luteal phase (days)", lutealHelp:"Typically ~14 days. Adjust if needed.", show:"Show Calendar", normal:"Normal", fertile:"Fertile", ovulation:"Ovulation", today:"Today", print:"Print/PDF", share:"Share", disclaimer:"Note: This is an educational tool — not medical advice. Consult a professional for personal decisions.", invalidStart:"Please enter a date.", invalidCycle:"Enter 20–40 days.", weekdays:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], locale:"en-US" }
+    };
+
+    let LANG = localStorage.getItem('fertCalLang') || 'bn';
+
+    function applyTexts(){
+      const t=T[LANG];
+      document.documentElement.lang = LANG;
+      title.textContent=t.title; subtitle.textContent=t.subtitle;
+      labelStart.textContent=t.start; labelCycle.textContent=t.cycle; labelMonths.textContent=t.months; monthsHint.textContent=t.monthsHint;
+      labelLuteal.textContent=t.luteal; lutealHelp.textContent=t.lutealHelp;
+      btnShow.textContent=t.show; legendNormal.textContent=t.normal; legendFertile.textContent=t.fertile; legendOvulation.textContent=t.ovulation; legendToday.textContent=t.today;
+      btnPrintTxt.textContent=t.print; btnShareTxt.textContent=t.share; disclaimer.textContent=t.disclaimer;
+      invalidStart.textContent=t.invalidStart; invalidCycle.textContent=t.invalidCycle;
+      // Regenerate calendar to update weekday headers + month names
+      maybeRenderFromInputs();
+    }
+
+    // ==== Date helpers ====
+    function fmtMonth(date){ return date.toLocaleString(T[LANG].locale, {month:'long', year:'numeric'}); }
+    function startOfMonth(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+    function daysInMonth(d){ return new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); }
+    function getOvulationDate(periodStart, cycleLength, luteal){ const ov=new Date(periodStart); ov.setDate(periodStart.getDate() + (cycleLength - luteal)); return ov; }
+
+    // ==== Calendar builder ====
+    function buildMonthGrid(container, year, month, fertileStart, fertileEnd, ovulation){
+      const holder=document.createElement('div');
+      const title=document.createElement('div'); title.className='month-title'; title.textContent=fmtMonth(new Date(year,month,1)); holder.appendChild(title);
+      const grid=document.createElement('div'); grid.className='calendar';
+      // weekday headings
+      T[LANG].weekdays.forEach(w=>{ const wd=document.createElement('div'); wd.className='weekday small'; wd.textContent=w; wd.setAttribute('aria-hidden','true'); grid.appendChild(wd); });
+
+      const first=new Date(year,month,1); const offset=first.getDay(); const total=daysInMonth(first);
+      for(let i=0;i<offset;i++){ const empty=document.createElement('div'); empty.className='cell empty'; grid.appendChild(empty);} 
+
+      const todayStr=new Date().toDateString();
+      for(let day=1; day<=total; day++){
+        const date=new Date(year,month,day);
+        const cell=document.createElement('button'); cell.type='button'; cell.className='cell';
+        cell.textContent=day.toLocaleString(T[LANG].locale);
+        cell.setAttribute('aria-label', date.toLocaleDateString(T[LANG].locale,{weekday:'long', day:'numeric', month:'long', year:'numeric'}));
+        let cls=''; let tip=T[LANG].normal;
+        if(date>=fertileStart && date<=fertileEnd){ cls='fertile'; tip=T[LANG].fertile; }
+        if(date.toDateString()===ovulation.toDateString()){ cls='ovulation'; tip=T[LANG].ovulation; }
+        if(date.toDateString()===todayStr){ cell.classList.add('today'); }
+        if(cls) cell.classList.add(cls);
+        cell.setAttribute('data-bs-toggle','tooltip'); cell.setAttribute('data-bs-placement','top'); cell.setAttribute('title', tip);
+        grid.appendChild(cell);
+      }
+      holder.appendChild(grid); container.appendChild(holder);
+    }
+
+    function generateCalendar(periodStart, cycleLength, monthsToShow, luteal){
+      const wrap=document.getElementById('calendarGrid'); wrap.innerHTML='';
+      const ov=getOvulationDate(periodStart, cycleLength, luteal);
+      const fertileStart=new Date(ov); fertileStart.setDate(ov.getDate()-5);
+      const fertileEnd=new Date(ov); fertileEnd.setDate(ov.getDate()+1);
+      const base=startOfMonth(periodStart);
+      for(let m=0;m<monthsToShow;m++){
+        const d=new Date(base.getFullYear(), base.getMonth()+m, 1);
+        buildMonthGrid(wrap, d.getFullYear(), d.getMonth(), fertileStart, fertileEnd, ov);
+      }
+      // tooltips
+      const tooltipTriggerList=[].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      tooltipTriggerList.forEach(el=> new bootstrap.Tooltip(el));
+    }
+
+    // ==== Form + state ====
+    const form=document.getElementById('calendarForm');
+    const startEl=document.getElementById('periodStart');
+    const cycleEl=document.getElementById('cycleLength');
+    const monthsEl=document.getElementById('monthsToShow');
+    const lutealEl=document.getElementById('lutealLength');
+
+    // Restore state from localStorage
+    const saved=JSON.parse(localStorage.getItem('fertileCalendarBNEN')||'{}');
+    if(saved.periodStart) startEl.value=saved.periodStart;
+    if(saved.cycleLength) cycleEl.value=saved.cycleLength;
+    if(saved.monthsToShow) monthsEl.value=saved.monthsToShow;
+    if(saved.lutealLength) lutealEl.value=saved.lutealLength;
+
+    function saveState(){ localStorage.setItem('fertileCalendarBNEN', JSON.stringify({ periodStart:startEl.value, cycleLength:cycleEl.value, monthsToShow:monthsEl.value, lutealLength:lutealEl.value })); }
+
+    form.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      if(!form.checkValidity()){ form.classList.add('was-validated'); return; }
+      const start=new Date(startEl.value); const cycle=parseInt(cycleEl.value,10); const months=parseInt(monthsEl.value,10); const luteal=Math.min(Math.max(parseInt(lutealEl.value||'14',10),10),17);
+      generateCalendar(start, cycle, months, luteal); saveState();
+    });
+
+    resetBtn.addEventListener('click', ()=>{ form.reset(); calendarGrid.innerHTML=''; localStorage.removeItem('fertileCalendarBNEN'); form.classList.remove('was-validated'); });
+    printBtn.addEventListener('click', ()=> window.print());
+
+    shareBtn.addEventListener('click', async ()=>{
+      try{
+        const url=new URL(window.location.href);
+        if(startEl.value) url.searchParams.set('start', startEl.value);
+        if(cycleEl.value) url.searchParams.set('cycle', cycleEl.value);
+        if(monthsEl.value) url.searchParams.set('months', monthsEl.value);
+        if(lutealEl.value) url.searchParams.set('luteal', lutealEl.value);
+        const shareData={ title:T[LANG].title, text:T[LANG].title, url:url.toString() };
+        if(navigator.share) await navigator.share(shareData); else{ await navigator.clipboard.writeText(url.toString()); alert(LANG==='bn'?'লিংক কপি করা হয়েছে!':'Link copied!'); }
+      }catch(err){ console.error(err); }
+    });
+
+    function maybeRenderFromInputs(){
+      if(startEl.value && cycleEl.value){
+        const start=new Date(startEl.value); const cycle=parseInt(cycleEl.value,10); const months=parseInt(monthsEl.value,10); const luteal=parseInt(lutealEl.value||'14',10);
+        generateCalendar(start, cycle, months, luteal);
+      }
+    }
+
+    // URL params
+    (function initFromParams(){
+      const p=new URLSearchParams(window.location.search);
+      if(p.get('start')) startEl.value=p.get('start');
+      if(p.get('cycle')) cycleEl.value=p.get('cycle');
+      if(p.get('months')) monthsEl.value=p.get('months');
+      if(p.get('luteal')) lutealEl.value=p.get('luteal');
+      maybeRenderFromInputs();
+    })();
+
+    // Lang switcher
+    const langSel=document.getElementById('langSwitcher');
+    langSel.value=LANG; applyTexts();
+    langSel.addEventListener('change', (e)=>{ LANG=e.target.value; localStorage.setItem('fertCalLang', LANG); applyTexts(); });
+  </script>
+</body>
+</html>
